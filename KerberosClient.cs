@@ -2,6 +2,7 @@
 using System.Net;
 using System.Text;
 using System.Security.Cryptography;
+using System.Dynamic;
 
 namespace Kerberos
 {
@@ -11,18 +12,35 @@ namespace Kerberos
         Socket Client;
         long Id;
         long Tgs;
-        string KeyClient;
+        byte[] KeyClient;
         byte[] KeyClientTgs;
         byte[] KeyClientSs;
+        byte[] ServerId;
+        DateTime DateTimeFromServer;
 
-        public KerberosClient(long id, long tgs) : base()
+
+        public KerberosClient() : base()
+        {
+            CreateClient();
+            Id = 123;
+            Tgs = 123;
+            KeyClient = Encoding.UTF8.GetBytes("mysmallkey127426");
+            KeyClientTgs = new byte[16];
+            KeyClientTgs = new byte[16];
+            DateTimeFromServer = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+            ServerId = Encoding.UTF8.GetBytes("123456789");
+        }
+
+        public KerberosClient(long id, long tgs, byte[] keyClient, byte[] serverId) : base()
         {
             CreateClient();
             Id = id;
             Tgs = tgs;
-            KeyClient = "mysmallkey127426";
+            KeyClient = keyClient;
             KeyClientTgs = new byte[16];
             KeyClientTgs = new byte[16];
+            ServerId = serverId;
+            DateTimeFromServer = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
         }
 
         private void CreateClient() {
@@ -40,7 +58,6 @@ namespace Kerberos
 
         private byte[] PrepareMessageToTgs(byte[] responseFromAs)
         {
-            byte[] server = Encoding.UTF8.GetBytes("123456789");
             byte[] tgtEncrypted = new byte[responseFromAs.Length - 16];
             KeyClientTgs = new byte[16];
             int i = 0;
@@ -54,13 +71,13 @@ namespace Kerberos
             byte[] auth = Encoding.UTF8.GetBytes(Id.ToString() + "<|S|>" + timeStamp.ToString());
             AesEncryptor.Key = KeyClientTgs;
             byte[] authEncrypted = AesEncryptor.EncryptEcb(auth, PaddingMode.Zeros);
-            byte[] message = new byte[tgtEncrypted.Length + authEncrypted.Length + server.Length + 3];
+            byte[] message = new byte[tgtEncrypted.Length + authEncrypted.Length + ServerId.Length + 3];
             message[0] = (byte)tgtEncrypted.Length;
             message[1] = (byte)authEncrypted.Length;
-            message[2] = (byte)server.Length;
+            message[2] = (byte)ServerId.Length;
             tgtEncrypted.CopyTo(message, 3);
             authEncrypted.CopyTo(message, tgtEncrypted.Length+3);
-            server.CopyTo(message, tgtEncrypted.Length + authEncrypted.Length + 3);
+            ServerId.CopyTo(message, tgtEncrypted.Length + authEncrypted.Length + 3);
             return message;
         }
 
@@ -99,7 +116,7 @@ namespace Kerberos
                 int received = Client.Receive(buffer, SocketFlags.None);
                 if (buffer.Length > 0) {
                     Console.WriteLine("Socket client recieved message from auth server...");
-                    AesEncryptor.Key = Encoding.UTF8.GetBytes(KeyClient);
+                    AesEncryptor.Key = KeyClient;
                     byte[] result = AesEncryptor.DecryptEcb(buffer, PaddingMode.Zeros);
                     Client.Shutdown(SocketShutdown.Both);
                     Client.Disconnect(true);
@@ -168,13 +185,16 @@ namespace Kerberos
 
         public override void Start()
         {
-            DateTime dateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
-            Console.WriteLine(dateTime.AddSeconds(GetTimeStamp()).ToLocalTime());
+            Console.WriteLine(DateTimeFromServer.AddSeconds(GetTimeStamp()).ToLocalTime());
             var responseFromAs = SendMessToAs();
             var responseFromTgs = SendMessToTgs(responseFromAs);
             var responseFromServer = SendMessToSs(responseFromTgs);
-            dateTime = dateTime.AddSeconds(double.Parse(Encoding.UTF8.GetString(responseFromServer))).ToLocalTime();
-            Console.WriteLine(dateTime);
+            DateTimeFromServer = DateTimeFromServer.AddSeconds(double.Parse(Encoding.UTF8.GetString(responseFromServer))).ToLocalTime();
+            Console.WriteLine(DateTimeFromServer);
+        }
+
+        public DateTime GetTimeFromServer () {
+            return DateTimeFromServer;
         }
 
         public void Start1()

@@ -11,9 +11,9 @@ namespace Kerberos
 
         string[][] ClientDb;
 
-        string KeyTgs = "mysmallkey123456";
+        byte[] KeyTgs;
 
-        public KerberosAs()
+        public KerberosAs() : base() 
         {
             Server = new(IpAddr.AddressFamily,
                             SocketType.Stream,
@@ -21,6 +21,16 @@ namespace Kerberos
             ClientDb = new string[][] { 
                         new string [] {"123", "mysmallkey127426" }, 
                         }; // id, password (key_c)
+            KeyTgs = Encoding.UTF8.GetBytes("mysmallkey123456");
+        }
+
+        public KerberosAs(byte[] keyTgs, string[][] clientDb) : base ()
+        {
+            Server = new(IpAddr.AddressFamily,
+                            SocketType.Stream,
+                            ProtocolType.Tcp);
+            ClientDb = clientDb;
+            KeyTgs = keyTgs;
         }
 
         public byte[] PrepareResponseToClient(string response) {
@@ -42,12 +52,12 @@ namespace Kerberos
                           timeStamp.ToString() + "<|S|>" +
                           period.ToString() + "<|S|>" +
                           Encoding.UTF8.GetString(keyClientTgs));
-                AesEncryptor.Key = Encoding.UTF8.GetBytes(KeyTgs);
+                AesEncryptor.Key = KeyTgs;
                 byte[] tgtEncrypted = AesEncryptor.EncryptEcb(tgt, PaddingMode.Zeros);
                 byte[] message = new byte[keyClientTgs.Length + tgtEncrypted.Length];
                 keyClientTgs.CopyTo(message, 0);
                 tgtEncrypted.CopyTo(message, keyClientTgs.Length);
-                AesEncryptor.Key = Encoding.UTF8.GetBytes(keyClient);
+                AesEncryptor.Key = Encoding.UTF8.GetBytes(keyClient, 0, 16);
                 return AesEncryptor.EncryptEcb(message, PaddingMode.Zeros);
             }
             return new byte[0];

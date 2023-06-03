@@ -1,9 +1,7 @@
-﻿using System;
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Kerberos
 {
@@ -11,9 +9,9 @@ namespace Kerberos
     {
         Socket Server;
 
-        string KeyTgs = "mysmallkey123456";
+        byte[] KeyTgs;
 
-        long Id = 123;
+        long Id;
 
         string[][] ServerDb;
 
@@ -26,7 +24,19 @@ namespace Kerberos
             ServerDb = new string[][] {
                         new string [] {"123456789", "nosmallkeu127322" },
                         }; // id, key_tgs_ss
+            KeyTgs = Encoding.UTF8.GetBytes("mysmallkey123456");
+            Id = 123;
 
+        }
+
+        public KerberosTgs(byte[] keyTgs, string[][] serverDb, long id) : base () {
+            Server = new(IpAddr.AddressFamily,
+                            SocketType.Stream,
+                            ProtocolType.Tcp);
+            LocalEndPoint = new IPEndPoint(IpAddr, 11113);
+            ServerDb = serverDb;
+            KeyTgs = keyTgs;    
+            Id = id;
         }
 
         public byte[] PrepareResponseToClient(byte[] response)
@@ -47,7 +57,7 @@ namespace Kerberos
                 serverArr[i - authEncrypted.Length - tgtEncrypted.Length - 3] = response[i];
             }
 
-            AesEncryptor.Key = Encoding.UTF8.GetBytes(KeyTgs);
+            AesEncryptor.Key = KeyTgs;
             byte[] tgt = AesEncryptor.DecryptEcb(tgtEncrypted, PaddingMode.Zeros);
             var tgtArray = Encoding.UTF8.GetString(tgt).Split("<|S|>");
             byte[] keyClientTgs = Encoding.UTF8.GetBytes(tgtArray[tgtArray.Length-1], 0, 16);

@@ -9,16 +9,27 @@ namespace Kerberos
     {
         Socket Server;
 
-        string KeyTgsSs = "nosmallkeu127322";
+        byte[] KeyTgsSs;
 
-        long Id = 123456789;
+        long Id;
 
-        public KerberosServer() : base()
+        public KerberosServer() : base() {
+            Server = new(IpAddr.AddressFamily,
+                            SocketType.Stream,
+                            ProtocolType.Tcp);
+            LocalEndPoint = new IPEndPoint(IpAddr, 11115);
+            KeyTgsSs = Encoding.UTF8.GetBytes("nosmallkeu127322");
+            Id = 123456789;
+        }
+            
+        public KerberosServer(byte[] keyTgsSs, long id) : base()
         {
             Server = new(IpAddr.AddressFamily,
                             SocketType.Stream,
                             ProtocolType.Tcp);
             LocalEndPoint = new IPEndPoint(IpAddr, 11115);
+            KeyTgsSs = keyTgsSs;
+            Id = id;
         }
 
         public byte[] PrepareResponseToClient(byte[] response)
@@ -35,14 +46,13 @@ namespace Kerberos
                 authEncrypted[i - tgsEncrypted.Length - 2] = response[i];
             }
 
-            AesEncryptor.Key = Encoding.UTF8.GetBytes(KeyTgsSs);
+            AesEncryptor.Key = KeyTgsSs;
             byte[] tgs = AesEncryptor.DecryptEcb(tgsEncrypted, PaddingMode.Zeros);
             var tgsArray = Encoding.UTF8.GetString(tgs).Split("<|S|>");
             byte[] keyClientSs = Encoding.UTF8.GetBytes(tgsArray[tgsArray.Length - 1], 0, 16);
             AesEncryptor.Key = keyClientSs;
             byte[] auth = AesEncryptor.DecryptEcb(authEncrypted, PaddingMode.Zeros);
             var authArray = Encoding.UTF8.GetString(auth).Split("<|S|>");
-
             var clientFromTgs = long.Parse(tgsArray[0]);
             var ssId = long.Parse(tgsArray[1]);
             var timeStamp3 = long.Parse(tgsArray[2]);
